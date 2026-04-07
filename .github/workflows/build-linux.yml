@@ -8,8 +8,6 @@ on:
         description: "Version (e.g. 1.13.6-v2bx.10)"
         required: true
         type: string
-  release:
-    types: [published]
 
 jobs:
   linux-amd64:
