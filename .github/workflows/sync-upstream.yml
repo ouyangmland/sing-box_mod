@@ -1,9 +1,6 @@
 name: Sync Upstream
 
 on:
-  schedule:
-    # Check upstream every 6 hours
-    - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       force:
@@ -11,8 +8,10 @@ on:
         required: false
         default: 'false'
         type: boolean
+  schedule:
+    # Check upstream every 6 hours
+    - cron: '0 */6 * * *'
   repository_dispatch:
-    # Allow manual trigger or trigger from other workflows
     types: [sync-upstream]
 
 concurrency:
