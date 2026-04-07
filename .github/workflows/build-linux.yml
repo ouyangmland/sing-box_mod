@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version (e.g. 1.13.6-v2bx.9)"
+        description: "Version (e.g. 1.13.6-v2bx.10)"
         required: true
         type: string
-  push:
-    branches:
-      - v2bx-stable
+  release:
+    types: [published]
 
 jobs:
   linux-amd64:
@@ -28,12 +27,14 @@ jobs:
           GOOS: linux
           GOARCH: amd64
         run: |
-          LDFLAGS="-X github.com/sagernet/sing-box/cmd.version=v${{ inputs.version }} -s -w"
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          LDFLAGS="-X github.com/sagernet/sing-box/cmd.version=v${VERSION} -s -w"
           mkdir -p dist
           go build -ldflags="${LDFLAGS}" -trimpath -o dist/sing-box-linux-amd64 ./cmd/sing-box
       - uses: actions/upload-artifact@v4
         with:
-          name: sing-box-linux-amd64-${{ inputs.version }}
+          name: sing-box-linux-amd64
           path: dist/sing-box-linux-amd64
           retention-days: 7
 
@@ -53,11 +54,47 @@ jobs:
           GOOS: linux
           GOARCH: arm64
         run: |
-          LDFLAGS="-X github.com/sagernet/sing-box/cmd.version=v${{ inputs.version }} -s -w"
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          LDFLAGS="-X github.com/sagernet/sing-box/cmd.version=v${VERSION} -s -w"
           mkdir -p dist
           go build -ldflags="${LDFLAGS}" -trimpath -o dist/sing-box-linux-arm64 ./cmd/sing-box
       - uses: actions/upload-artifact@v4
         with:
-          name: sing-box-linux-arm64-${{ inputs.version }}
+          name: sing-box-linux-arm64
           path: dist/sing-box-linux-arm64
           retention-days: 7
+
+  release:
+    name: Create Release
+    needs: [linux-amd64, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sing-box-linux-*
+          merge-multiple: false
+
+      - name: Make binaries executable
+        run: chmod +x sing-box-linux-amd64 sing-box-linux-arm64
+
+      - name: Determine version
+        id: vars
+        run: |
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && 'v' + inputs.version || github.ref_name }}
+          name: sing-box ${{ steps.vars.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            sing-box-linux-amd64
+            sing-box-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
