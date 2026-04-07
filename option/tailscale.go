@@ -61,7 +61,7 @@ func (d DERPVerifyClientURLOptions) ServerIsDomain() bool {
 	if err != nil {
 		return false
 	}
-	return M.ParseSocksaddr(verifyURL.Hostname()).IsDomain()
+	return M.IsDomainName(verifyURL.Host)
 }
 
 func (d DERPVerifyClientURLOptions) MarshalJSON() ([]byte, error) {
