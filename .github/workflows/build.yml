@@ -23,6 +23,10 @@ on:
           - tvOS
           - macOS-standalone
           - publish-android
+  release:
+    types: [published]
+  repository_dispatch:
+    types: [build-release]
   push:
     branches:
       - v2bx-stable
@@ -53,8 +57,15 @@ jobs:
         run: |-
           echo "version=${{ inputs.version }}"
           echo "version=${{ inputs.version }}" >> "$GITHUB_ENV"
+      - name: Get version from release
+        if: github.event_name == 'release' || (github.event_name == 'repository_dispatch' && github.event.action == 'build-release')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_ENV"
+
       - name: Calculate version
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' && github.event_name != 'release' && !(github.event_name == 'repository_dispatch' && github.event.action == 'build-release')
         run: |-
           go run -v ./cmd/internal/read_tag --ci --nightly
       - name: Set outputs

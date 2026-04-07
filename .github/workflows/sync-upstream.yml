@@ -1,0 +1,336 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # Check upstream every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force re-sync even if version exists'
+        required: false
+        default: 'false'
+        type: boolean
+  repository_dispatch:
+    # Allow manual trigger or trigger from other workflows
+    types: [sync-upstream]
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync upstream
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.sync.outputs.tag }}
+      skipped: ${{ steps.sync.outputs.skipped }}
+      upstream_tag: ${{ steps.sync.outputs.upstream_tag }}
+      version: ${{ steps.sync.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.25.8'
+
+      - name: Get latest upstream tag
+        id: upstream
+        run: |
+          UPSTREAM_TAG=$(curl -sL https://api.github.com/repos/SagerNet/sing-box/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          echo "tag=${UPSTREAM_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${UPSTREAM_TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Found upstream tag: $UPSTREAM_TAG"
+
+      - name: Check if v2bx tag exists
+        id: check_tag
+        run: |
+          V2BX_TAG="v${{ steps.upstream.outputs.version }}-v2bx.0"
+          if git ls-remote --exit-code --tags origin "${V2BX_TAG}" 2>/dev/null; then
+            if [[ "${{ github.event.inputs.force }}" != "true" ]]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
+              echo "Skipping: ${V2BX_TAG} already exists"
+            else
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download official sing-box
+        if: steps.check_tag.outputs.exists != 'true'
+        id: download
+        run: |
+          mkdir -p upstream
+          curl -sL -o sing-box.tar.gz "https://github.com/SagerNet/sing-box/archive/refs/tags/${{ steps.upstream.outputs.tag }}.tar.gz"
+          tar -xzf sing-box.tar.gz -C upstream --strip-components=1
+          rm sing-box.tar.gz
+          echo "dir=$(pwd)/upstream" >> "$GITHUB_OUTPUT"
+          echo "Downloaded to $(pwd)/upstream"
+
+      - name: Fetch MoeclubM v2bx.2 files
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          MoeMod="v1.13.1-beta.2-v2bx.2"
+          mkdir -p moeclub
+          curl -sL -o moeclub.tar.gz "https://github.com/MoeclubM/sing-box_mod/archive/refs/tags/${MoeMod}.tar.gz"
+          tar -xzf moeclub.tar.gz -C moeclub --strip-components=1
+          rm moeclub.tar.gz
+          echo "Fetched MoeclubM mod files"
+
+      - name: Apply V2BX patches
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          set -xeuo pipefail
+          UPSTREAM="${{ steps.download.outputs.dir }}"
+          MoeMod="$(pwd)/moeclub"
+
+          cd "$UPSTREAM"
+
+          # 1. third_party/sagernet/sing-vmess
+          mkdir -p third_party/sagernet/sing-vmess
+          cp -r ${MoeMod}/third_party/sagernet/sing-vmess/* third_party/sagernet/sing-vmess/
+
+          # 2. *_user.go files
+          for proto in vmess vless trojan shadowsocks tuic hysteria hysteria2 anytls; do
+            mkdir -p "protocol/${proto}"
+            [ -f "${MoeMod}/protocol/${proto}/${proto}_user.go" ] && cp "${MoeMod}/protocol/${proto}/${proto}_user.go" "protocol/${proto}/"
+            [ -f "${MoeMod}/protocol/${proto}/inbound.go" ] && cp "${MoeMod}/protocol/${proto}/inbound.go" "protocol/${proto}/"
+          done
+
+          # 3. naive_user.go
+          mkdir -p protocol/naive
+          cat > protocol/naive/naive_user.go << 'NAIVE_EOF'
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2025 V2BX contributors
+
+package naive
+
+import (
+	"context"
+	"crypto/tls"
+
+	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/auth"
+)
+
+type Inbound struct {
+	tag       string
+	users     []auth.User
+	server    *uint16
+	tlsConfig *tls.Config
+}
+
+func NewInbound(ctx context.Context, tag string, options option.NaiveInboundOptions) (*Inbound, error) {
+	inbound := &Inbound{tag: tag}
+	err := inbound.UpdateUsers(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return inbound, nil
+}
+
+func (n *Inbound) UpdateUsers(ctx context.Context, options option.NaiveInboundOptions) error {
+	n.users = nil
+	for _, user := range options.Users {
+		n.users = append(n.users, auth.User{Username: user.Username, Password: user.Password})
+	}
+	return nil
+}
+
+func (n *Inbound) AddUsers(users []auth.User) error {
+	for _, user := range users {
+		exists := false
+		for i, existing := range n.users {
+			if existing.Username == user.Username {
+				n.users[i].Password = user.Password
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			n.users = append(n.users, user)
+		}
+	}
+	return nil
+}
+
+func (n *Inbound) DelUsers(usernames []string) error {
+	for _, username := range usernames {
+		for i, user := range n.users {
+			if user.Username == username {
+				n.users = append(n.users[:i], n.users[i+1:]...)
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (n *Inbound) SetTLS(config *tls.Config) { n.tlsConfig = config }
+func (n *Inbound) SetTLSPort(port uint16)   { n.server = &port }
+func (n *Inbound) Type() string             { return common.TypeInbound(n) }
+NAIVE_EOF
+
+          # 4. adapter/neighbor_entry.go
+          cat > adapter/neighbor_entry.go << 'NBR_EOF'
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2025 V2BX contributors
+
+package adapter
+
+import "net/netip"
+
+type NeighborEntry interface {
+	GetDestination() netip.AddrPort
+}
+NBR_EOF
+
+          # 5. go.mod / go.sum from MoeclubM
+          cp ${MoeMod}/go.mod .
+          cp ${MoeMod}/go.sum .
+
+          # 6. option file patches
+          for f in dns outbound tailscale; do
+            [ -f "${MoeMod}/option/${f}.go" ] && cp "${MoeMod}/option/${f}.go" "option/${f}.go"
+          done
+          [ -f "${MoeMod}/transport/trojan/protocol.go" ] && cp "${MoeMod}/transport/trojan/protocol.go" transport/trojan/
+
+          # 7. GetCtx in router.go
+          if ! grep -q "func (r \*Router) GetCtx()" route/router.go; then
+            cat >> route/router.go << 'ROUTER_EOF'
+
+func (r *Router) GetCtx() context.Context {
+	return r.ctx
+}
+ROUTER_EOF
+          fi
+
+          # 8. GetCtx in adapter/router.go interface
+          if ! grep -q "GetCtx()" adapter/router.go; then
+            sed -i 's/type Router interface {/type Router interface {\n\tGetCtx() context.Context/' adapter/router.go
+          fi
+
+          echo "=== Patched files ==="
+          find . -name "*.go" -newer ${MoeMod}/go.mod | head -20
+
+      - name: Download Go modules
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          cd "${{ steps.download.outputs.dir }}"
+          GOPROXY=https://proxy.golang.org,direct go mod download 2>&1 | tail -3
+
+      - name: Verify build
+        if: steps.check_tag.outputs.exists != 'true'
+        id: build
+        run: |
+          cd "${{ steps.download.outputs.dir }}"
+          GOEXPERIMENT=jsonv2 CGO_ENABLED=0 go build -v -trimpath -o /tmp/sing-box-test ./cmd/sing-box 2>&1 | tail -3
+          echo "size=$(stat -c%s /tmp/sing-box-test)" >> "$GITHUB_OUTPUT"
+          echo "Build OK: $(du -h /tmp/sing-box-test | cut -f1)"
+
+      - name: Commit and push
+        if: steps.check_tag.outputs.exists != 'true'
+        id: push
+        run: |
+          set -xeuo pipefail
+          UPSTREAM="${{ steps.download.outputs.dir }}"
+          V2BX_TAG="v${{ steps.upstream.outputs.version }}-v2bx.0"
+
+          cd "$UPSTREAM"
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git checkout -B v2bx-stable
+          git add -A
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
+          git push origin v2bx-stable --force-with-lease
+          git tag -a "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
+          git push origin "${V2BX_TAG}"
+          echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
+          echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "Pushed: ${V2BX_TAG}"
+
+      - name: Create GitHub release
+        if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        with:
+          tag_name: ${{ steps.push.outputs.tag }}
+          release_name: "sing-box-mod ${{ steps.push.outputs.tag }} (based on ${{ steps.upstream.outputs.tag }})"
+          body: |
+            ## V2BX Release ${{ steps.push.outputs.tag }}
+
+            Based on [sing-box ${{ steps.upstream.outputs.tag }}](https://github.com/SagerNet/sing-box/releases/tag/${{ steps.upstream.outputs.tag }}).
+
+            ### Changes
+            - Sync with upstream sing-box ${{ steps.upstream.outputs.tag }}
+            - V2BX modifications (user management, NeighborEntry, GetCtx, etc.)
+
+            Built automatically by GitHub Actions.
+          draft: false
+          prerelease: false
+
+      - name: Output skip message
+        if: steps.check_tag.outputs.exists == 'true'
+        id: skip
+        run: |
+          echo "tag=${{ steps.check_tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "skipped=true" >> "$GITHUB_OUTPUT"
+          echo "Upstream ${{ steps.upstream.outputs.tag }} already synced as ${{ steps.check_tag.outputs.tag }}"
+
+  build-trigger:
+    name: Trigger build
+    runs-on: ubuntu-latest
+    needs: sync
+    if: needs.sync.outputs.tag != '' && needs.sync.outputs.skipped != 'true'
+    steps:
+      - name: Dispatch build workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            // Trigger build.yml via repository_dispatch
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              event_type: 'build-release',
+              client_payload: {
+                tag: '${{ needs.sync.outputs.tag }}',
+                upstream_tag: '${{ needs.sync.outputs.upstream_tag }}'
+              }
+            });
+
+      - name: Also trigger via release
+        if: needs.sync.outputs.tag != ''
+        run: |
+          echo "Release ${{ needs.sync.outputs.tag }} created, build.yml will trigger on 'release' event"
+
+  notify:
+    name: Notify completion
+    runs-on: ubuntu-latest
+    needs: [sync, build-trigger]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          if [[ "${{ needs.sync.outputs.skipped }}" == "true" ]]; then
+            echo "Upstream already synced. No new release needed."
+          else
+            echo "Sync completed: ${{ needs.sync.outputs.tag }}"
+          fi
