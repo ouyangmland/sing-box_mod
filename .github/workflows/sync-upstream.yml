@@ -294,37 +294,10 @@ ROUTER_EOF
           echo "skipped=true" >> "$GITHUB_OUTPUT"
           echo "Upstream ${{ steps.upstream.outputs.tag }} already synced as ${{ steps.check_tag.outputs.tag }}"
 
-  build-trigger:
-    name: Trigger build
-    runs-on: ubuntu-latest
-    needs: sync
-    if: needs.sync.outputs.tag != '' && needs.sync.outputs.skipped != 'true'
-    steps:
-      - name: Dispatch build workflow
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GH_PAT }}
-          script: |
-            // Trigger build.yml via repository_dispatch
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.name,
-              event_type: 'build-release',
-              client_payload: {
-                tag: '${{ needs.sync.outputs.tag }}',
-                upstream_tag: '${{ needs.sync.outputs.upstream_tag }}'
-              }
-            });
-
-      - name: Also trigger via release
-        if: needs.sync.outputs.tag != ''
-        run: |
-          echo "Release ${{ needs.sync.outputs.tag }} created, build.yml will trigger on 'release' event"
-
   notify:
     name: Notify completion
     runs-on: ubuntu-latest
-    needs: [sync, build-trigger]
+    needs: [sync]
     if: always()
     steps:
       - name: Summary
