@@ -1,6 +1,5 @@
 name: Build Linux
 
-
 on:
   workflow_dispatch:
     inputs:
@@ -63,3 +62,51 @@ jobs:
           name: sing-box-linux-arm64
           path: dist/sing-box-linux-arm64
           retention-days: 7
+
+  release:
+    name: Create Release
+    needs: [linux-amd64, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify V2bX-singbox
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'ouyangmland',
+              repo: 'V2bX-singbox',
+              event_type: 'new-mod-release',
+              client_payload: { tag: '${{ steps.vars.outputs.version }}' }
+            });
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sing-box-linux-*
+          merge-multiple: false
+
+      - name: Make binaries executable
+        run: chmod +x sing-box-linux-amd64 sing-box-linux-arm64
+
+      - name: Determine version and tag
+        id: vars
+        run: |
+          # Always use github.ref_name as tag (works for both workflow_dispatch and release events)
+          FULL_TAG="${{ github.ref_name }}"
+          # Strip leading v to get version string
+          VERSION="${FULL_TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${FULL_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          name: sing-box ${{ steps.vars.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            sing-box-linux-amd64
+            sing-box-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
