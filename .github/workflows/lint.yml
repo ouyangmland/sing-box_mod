@@ -3,10 +3,9 @@ name: Lint
 on:
   push:
     branches:
-      - oldstable
-      - stable
-      - testing
-      - unstable
+      - v2bx-stable
+      - v2bx-testing
+      - v2bx-unstable
     paths-ignore:
       - '**.md'
       - '.github/**'
