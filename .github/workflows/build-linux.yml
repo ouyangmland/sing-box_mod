@@ -79,17 +79,23 @@ jobs:
       - name: Make binaries executable
         run: chmod +x sing-box-linux-amd64 sing-box-linux-arm64
 
-      - name: Determine version
+      - name: Determine version and tag
         id: vars
         run: |
-          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            TAG_NAME="v${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            TAG_NAME="${{ github.ref_name }}"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && 'v' + inputs.version || github.ref_name }}
+          tag_name: ${{ steps.vars.outputs.tag_name }}
           name: sing-box ${{ steps.vars.outputs.version }}
           draft: false
           prerelease: false
