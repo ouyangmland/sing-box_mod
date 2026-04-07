@@ -227,3 +227,7 @@ func (r *Router) ResetNetwork() {
 	r.network.ResetNetwork()
 	r.dns.ResetNetwork()
 }
+
+func (r *Router) GetCtx() context.Context {
+	return r.ctx
+}
