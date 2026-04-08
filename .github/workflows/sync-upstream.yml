@@ -59,7 +59,7 @@ jobs:
       - name: Check if v2bx tag exists
         id: check_tag
         run: |
-          V2BX_TAG="v${{ steps.upstream.outputs.version }}"
+          V2BX_TAG="v2bx-${{ steps.upstream.outputs.version }}"
           if git ls-remote --exit-code --tags origin "${V2BX_TAG}" 2>/dev/null; then
             if [[ "${{ github.event.inputs.force }}" != "true" ]]; then
               echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -251,7 +251,7 @@ ROUTER_EOF
         run: |
           set -xeuo pipefail
           UPSTREAM="${{ steps.download.outputs.dir }}"
-          V2BX_TAG="v${{ steps.upstream.outputs.version }}"
+          V2BX_TAG="v2bx-${{ steps.upstream.outputs.version }}"
 
           cd "$UPSTREAM"
           git config --global user.email "action@github.com"
