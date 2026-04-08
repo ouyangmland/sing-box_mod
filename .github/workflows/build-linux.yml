@@ -83,8 +83,12 @@ jobs:
       - name: Determine version and tag
         id: vars
         run: |
-          # Always use github.ref_name as tag (works for both workflow_dispatch and release events)
-          FULL_TAG="${{ github.ref_name }}"
+          # For workflow_dispatch, use the version input; for release events, use the tag
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FULL_TAG="${{ inputs.version }}"
+          else
+            FULL_TAG="${{ github.ref_name }}"
+          fi
           # Strip leading v to get version string
           VERSION="${FULL_TAG#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
