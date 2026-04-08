@@ -95,12 +95,20 @@ jobs:
         with:
           github-token: ${{ secrets.GH_PAT }}
           script: |
-            await github.rest.repos.createDispatchEvent({
-              owner: 'ouyangmland',
-              repo: 'V2bX-singbox',
-              event_type: 'new-mod-release',
-              client_payload: { tag: '${{ steps.vars.outputs.version }}' }
-            });
+            try {
+              console.log('Attempting to create dispatch event...');
+              console.log('Version: ${{ steps.vars.outputs.version }}');
+              const result = await github.rest.repos.createDispatchEvent({
+                owner: 'ouyangmland',
+                repo: 'V2bX-singbox',
+                event_type: 'new-mod-release',
+                client_payload: { tag: '${{ steps.vars.outputs.version }}' }
+              });
+              console.log('Success:', result.status);
+            } catch (error) {
+              console.error('Error:', error.message);
+              throw error;
+            }
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
