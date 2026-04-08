@@ -106,6 +106,8 @@ jobs:
           name: sing-box ${{ steps.vars.outputs.version }}
           draft: false
           prerelease: false
+          generate_release_notes: false
+          name: sing-box ${{ steps.vars.outputs.tag_name }}
           files: |
             sing-box-linux-amd64
             sing-box-linux-arm64
