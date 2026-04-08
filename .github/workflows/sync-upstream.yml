@@ -268,6 +268,13 @@ ROUTER_EOF
           echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
           echo "Pushed: ${V2BX_TAG}"
 
+      - name: Trigger build
+        if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
+        run: |
+          echo "Triggering build for ${{ steps.push.outputs.tag }}"
+          curl -s -X POST             -H "Authorization: token ${{ secrets.GH_PAT }}"             -H "Accept: application/vnd.github.v3+json"             -d '{"ref":"v2bx-stable","inputs":{"version":"${{ steps.upstream.outputs.tag }}"}}'             "https://api.github.com/repos/ouyangmland/sing-box_mod/actions/workflows/build-linux.yml/dispatches"
+          echo "Build triggered"
+
       - name: Create GitHub release
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
         uses: actions/create-release@v1
@@ -275,15 +282,15 @@ ROUTER_EOF
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         with:
           tag_name: ${{ steps.push.outputs.tag }}
-          release_name: "sing-box-mod ${{ steps.push.outputs.tag }} (based on ${{ steps.upstream.outputs.tag }})"
+          release_name: "sing-box ${{ steps.upstream.outputs.tag }}"
           body: |
-            ## V2BX Release ${{ steps.push.outputs.tag }}
+            ## V2BX Release based on sing-box ${{ steps.upstream.outputs.tag }}
 
-            Based on [sing-box ${{ steps.upstream.outputs.tag }}](https://github.com/SagerNet/sing-box/releases/tag/${{ steps.upstream.outputs.tag }}).
+            Built from [sing-box ${{ steps.upstream.outputs.tag }}](https://github.com/SagerNet/sing-box/releases/tag/${{ steps.upstream.outputs.tag }}).
 
             ### Changes
             - Sync with upstream sing-box ${{ steps.upstream.outputs.tag }}
-            - V2BX modifications (user management, NeighborEntry, GetCtx, etc.)
+            - V2BX modifications
 
             Built automatically by GitHub Actions.
           draft: false
