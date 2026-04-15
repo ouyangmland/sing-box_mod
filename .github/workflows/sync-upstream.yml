@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 1
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -272,14 +272,14 @@ jobs:
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
         run: |
           echo "Triggering build for ${{ steps.push.outputs.tag }}"
-          curl -s -X POST             -H "Authorization: token ${{ secrets.GH_PAT }}"             -H "Accept: application/vnd.github.v3+json"             -d '{"ref":"v2bx-stable","inputs":{"version":"${{ steps.upstream.outputs.tag }}"}}'             "https://api.github.com/repos/ouyangmland/sing-box_mod/actions/workflows/build-linux.yml/dispatches"
+          curl -s -X POST             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"             -H "Accept: application/vnd.github.v3+json"             -d '{"ref":"v2bx-stable","inputs":{"version":"${{ steps.upstream.outputs.tag }}"}}'             "https://api.github.com/repos/ouyangmland/sing-box_mod/actions/workflows/build-linux.yml/dispatches"
           echo "Build triggered"
 
       - name: Create GitHub release
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.push.outputs.tag }}
           release_name: "sing-box ${{ steps.upstream.outputs.tag }}"
