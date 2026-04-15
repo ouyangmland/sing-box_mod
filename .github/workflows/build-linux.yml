@@ -78,7 +78,7 @@ jobs:
           merge-multiple: false
 
       - name: Make binaries executable
-        run: chmod +x sing-box-linux-amd64 sing-box-linux-arm64
+        run: chmod +x sing-box-linux-amd64/dist/sing-box-linux-amd64 sing-box-linux-arm64/dist/sing-box-linux-arm64
 
       - name: Determine version and tag
         id: vars
@@ -112,8 +112,8 @@ jobs:
           generate_release_notes: false
           name: sing-box ${{ steps.vars.outputs.tag_name }}
           files: |
-            dist/sing-box-linux-amd64
-            dist/sing-box-linux-arm64
+            sing-box-linux-amd64/dist/sing-box-linux-amd64
+            sing-box-linux-arm64/dist/sing-box-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
