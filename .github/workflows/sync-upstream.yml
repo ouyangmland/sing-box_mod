@@ -228,7 +228,7 @@ jobs:
           fi
 
           echo "=== Patched files ==="
-          find . -name "*.go" -newer ${MoeMod}/go.mod | head -20
+          find . -name "*.go" -newer ${MoeMod}/go.mod | head -20 || true
 
       - name: Download Go modules
         if: steps.check_tag.outputs.exists != 'true'
