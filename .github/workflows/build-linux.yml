@@ -71,14 +71,20 @@ jobs:
     needs: [linux-amd64, linux-arm64]
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts
+      - name: Download amd64 artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: sing-box-linux-*
-          merge-multiple: false
+          name: sing-box-linux-amd64
+          path: .
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sing-box-linux-arm64
+          path: .
 
       - name: Make binaries executable
-        run: chmod +x sing-box-linux-amd64/dist/sing-box-linux-amd64 sing-box-linux-arm64/dist/sing-box-linux-arm64
+        run: chmod +x ./sing-box-linux-amd64/dist/sing-box-linux-amd64 ./sing-box-linux-arm64/dist/sing-box-linux-arm64
 
       - name: Determine version and tag
         id: vars
@@ -112,8 +118,8 @@ jobs:
           generate_release_notes: false
           name: sing-box ${{ steps.vars.outputs.tag_name }}
           files: |
-            sing-box-linux-amd64/dist/sing-box-linux-amd64
-            sing-box-linux-arm64/dist/sing-box-linux-arm64
+            ./sing-box-linux-amd64/dist/sing-box-linux-amd64
+            ./sing-box-linux-arm64/dist/sing-box-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
