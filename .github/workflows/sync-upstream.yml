@@ -247,11 +247,6 @@ jobs:
           echo "Fixed moeclub resolve.go from official sing-box source"
 
 
-      - name: Restore official go.mod (MoeclubM go.mod uses sing v0.8.1 which is incompatible)
-        if: steps.check_tag.outputs.exists != 'true'
-        run: |
-          cp go.mod go.sum upstream/
-          echo "Restored official go.mod (sing v0.8.9)"
 
       - name: Download Go modules
         if: steps.check_tag.outputs.exists != 'true'
