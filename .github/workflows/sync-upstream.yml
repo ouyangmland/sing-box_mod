@@ -231,12 +231,10 @@ jobs:
 
       - name: Create GitHub release
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ steps.push.outputs.tag }}
-          release_name: "sing-box ${{ steps.upstream.outputs.tag }}"
+          tag: ${{ steps.push.outputs.tag }}
+          name: "sing-box ${{ steps.upstream.outputs.tag }}"
           body: |
             ## V2BX Release based on sing-box ${{ steps.upstream.outputs.tag }}
 
