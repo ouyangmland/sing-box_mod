@@ -171,7 +171,8 @@ jobs:
           # Fix: overwrite MoeclubM's broken resolve.go with the official one.
           cp common/dialer/resolve.go moeclub/common/dialer/resolve.go
           cp common/dialer/default.go moeclub/common/dialer/default.go
-          echo "Fixed moeclub resolve.go and default.go from official sing-box source"
+          rm -f protocol/naive/naive_user.go
+          echo "Fixed moeclub resolve.go and default.go from official; removed broken naive_user.go"
 
 
 
