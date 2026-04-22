@@ -83,6 +83,12 @@ jobs:
           echo "dir=$(pwd)/upstream" >> "$GITHUB_OUTPUT"
           echo "Downloaded to $(pwd)/upstream"
 
+      - name: Save official go.mod (MoeclubM overwrites it with old sing v0.8.1)
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          cp upstream/go.mod upstream/go.sum ./
+          echo "Saved official go.mod/go.sum (sing v0.8.9)"
+
       - name: Fetch MoeclubM v2bx.2 files
         if: steps.check_tag.outputs.exists != 'true'
         run: |
@@ -241,6 +247,12 @@ jobs:
           echo "Fixed moeclub resolve.go from official sing-box source"
 
 
+      - name: Restore official go.mod (MoeclubM go.mod uses sing v0.8.1 which is incompatible)
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          cp go.mod go.sum upstream/
+          echo "Restored official go.mod (sing v0.8.9)"
+
       - name: Download Go modules
         if: steps.check_tag.outputs.exists != 'true'
         run: |
@@ -252,7 +264,8 @@ jobs:
         id: build
         run: |
           cd "${{ steps.download.outputs.dir }}"
-          GOEXPERIMENT=jsonv2 CGO_ENABLED=0 go build -v -trimpath -o /tmp/sing-box-test ./cmd/sing-box 2>&1 | tail -3
+          set -e
+          GOEXPERIMENT=jsonv2 CGO_ENABLED=0 go build -v -trimpath -o /tmp/sing-box-test ./cmd/sing-box
           echo "size=$(stat -c%s /tmp/sing-box-test)" >> "$GITHUB_OUTPUT"
           echo "Build OK: $(du -h /tmp/sing-box-test | cut -f1)"
 
