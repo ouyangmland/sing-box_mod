@@ -244,9 +244,16 @@ jobs:
           # which uses the correct IsDomain() API. This breaks compilation.
           # Fix: overwrite MoeclubM's broken resolve.go with the official one.
           cp common/dialer/resolve.go moeclub/common/dialer/resolve.go
-          echo "Fixed moeclub resolve.go from official sing-box source"
+          cp common/dialer/default.go moeclub/common/dialer/default.go
+          echo "Fixed moeclub resolve.go and default.go from official sing-box source"
 
 
+
+      - name: Restore official go.mod (MoeclubM's Apply V2BX step overwrites with sing v0.8.1)
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          cp go.mod go.sum upstream/
+          echo "Restored official go.mod (sing v0.8.9)"
 
       - name: Download Go modules
         if: steps.check_tag.outputs.exists != 'true'
