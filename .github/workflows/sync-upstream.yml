@@ -230,13 +230,15 @@ jobs:
           echo "=== Patched files ==="
           find . -name "*.go" -newer ${MoeMod}/go.mod | head -20 || true
 
-      - name: "Patch MoeclubM resolve.go for sing v0.8.8 compatibility"
+      - name: "Fix MoeclubM resolve.go API incompatibility"
         if: steps.check_tag.outputs.exists != 'true'
         run: |
-          # MoeclubM's common/dialer/resolve.go uses IsFqdn() which was removed in sing v0.8.8
-          # Replace IsFqdn() with Fqdn == "" (field access, compatible across all sing versions)
-          sed -i 's/destination\.IsFqdn()/destination.Fqdn == ""/g' common/dialer/resolve.go
-          grep -n "Fqdn ==" common/dialer/resolve.go || echo "Patch applied"
+          # MoeclubM's moeclub/common/dialer/resolve.go is based on old sing v0.8.1 API (IsFqdn)
+          # MoeclubM's "Apply V2BX patches" step copies this over the official sing-box resolve.go
+          # which uses the correct IsDomain() API. This breaks compilation.
+          # Fix: overwrite MoeclubM's broken resolve.go with the official one.
+          cp common/dialer/resolve.go moeclub/common/dialer/resolve.go
+          echo "Fixed moeclub resolve.go from official sing-box source"
 
 
       - name: Download Go modules
