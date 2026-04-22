@@ -230,6 +230,15 @@ jobs:
           echo "=== Patched files ==="
           find . -name "*.go" -newer ${MoeMod}/go.mod | head -20 || true
 
+      - name: "Patch MoeclubM resolve.go for sing v0.8.8 compatibility"
+        if: steps.check_tag.outputs.exists != 'true'
+        run: |
+          # MoeclubM's common/dialer/resolve.go uses IsFqdn() which was removed in sing v0.8.8
+          # Replace IsFqdn() with Fqdn == "" (field access, compatible across all sing versions)
+          sed -i 's/destination\.IsFqdn()/destination.Fqdn == ""/g' common/dialer/resolve.go
+          grep -n "Fqdn ==" common/dialer/resolve.go || echo "Patch applied"
+
+
       - name: Download Go modules
         if: steps.check_tag.outputs.exists != 'true'
         run: |
