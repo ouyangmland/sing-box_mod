@@ -191,6 +191,9 @@ jobs:
           # MoeclubM's older patches can lag upstream APIs. Keep official files where
           # the current upstream API has diverged, and drop stale overrides.
           cd "${{ steps.download.outputs.dir }}"
+          if grep -R "type NeighborEntry" -n adapter --exclude=neighbor_entry.go >/dev/null 2>&1; then
+            rm -f adapter/neighbor_entry.go
+          fi
           rm -f protocol/naive/naive_user.go
           # Rename older MoeclubM extension methods to the current upstream
           # adapter API used by sing-box v1.13.13+.
