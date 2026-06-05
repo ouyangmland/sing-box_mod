@@ -80,6 +80,7 @@ jobs:
         if: steps.check_tag.outputs.exists != 'true'
         id: download
         run: |
+          rm -rf upstream sing-box.tar.gz
           mkdir -p upstream
           curl -sL -o sing-box.tar.gz "https://github.com/SagerNet/sing-box/archive/refs/tags/${{ steps.upstream.outputs.tag }}.tar.gz"
           tar -xzf sing-box.tar.gz -C upstream --strip-components=1
