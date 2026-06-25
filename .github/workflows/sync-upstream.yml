@@ -196,18 +196,37 @@ jobs:
             rm -f adapter/neighbor_entry.go
           fi
           rm -f protocol/naive/naive_user.go
-          # Rename older MoeclubM extension methods to the current upstream
-          # adapter API used by sing-box v1.13.13+.
+          # Normalize MoeclubM inbound overrides to the adapter API used by the
+          # current upstream. sing-box v1.13.13 briefly used non-Ex handlers for
+          # these paths, while v1.13.14 restored Ex handlers; make the old patch
+          # files follow whichever API exists in the official upstream tree.
           python3 - <<'PY'
           from pathlib import Path
-          for name in ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go'):
+
+          handler_source = Path('adapter/handler.go').read_text()
+          upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
+          files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go')
+
+          if upstream_uses_ex:
+              replacements = {
+                  'NewUpstreamContextHandler(': 'NewUpstreamContextHandlerEx(',
+                  'func (h *Inbound) NewConnection(': 'func (h *Inbound) NewConnectionEx(',
+                  'NewConnection(ctx, conn, metadata, onClose)': 'NewConnectionEx(ctx, conn, metadata, onClose)',
+              }
+          else:
+              replacements = {
+                  'NewUpstreamContextHandlerEx(': 'NewUpstreamContextHandler(',
+                  'func (h *Inbound) NewConnectionEx(': 'func (h *Inbound) NewConnection(',
+                  'NewConnectionEx(ctx, conn, metadata, onClose)': 'NewConnection(ctx, conn, metadata, onClose)',
+              }
+
+          for name in files:
               path = Path(name)
               if not path.exists():
                   continue
               content = path.read_text()
-              content = content.replace('NewUpstreamContextHandlerEx', 'NewUpstreamContextHandler')
-              content = content.replace('func (h *Inbound) NewConnectionEx(', 'func (h *Inbound) NewConnection(')
-              content = content.replace('NewConnectionEx(ctx, conn, metadata, onClose)', 'NewConnection(ctx, conn, metadata, onClose)')
+              for old, new in replacements.items():
+                  content = content.replace(old, new)
               path.write_text(content)
           PY
           echo "Fixed stale MoeclubM patches for current upstream APIs"
