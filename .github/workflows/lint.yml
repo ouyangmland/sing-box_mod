@@ -34,6 +34,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: --timeout=30m
+          working-directory: upstream
+          args: --timeout=30m --build-tags=sing,with_quic,with_grpc,with_utls,with_wireguard,with_acme,with_gvisor
           install-mode: binary
           verify: false
