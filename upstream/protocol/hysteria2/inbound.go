@@ -45,7 +45,6 @@ type Inbound struct {
 	service       *hysteria2.Service[int]
 	userNameList  []string
 	userPasswords []string
-	userUUIDs     []string
 	uuidToUid     map[string]int
 	uidToUuid     map[int]string
 	userconns     sync.Map

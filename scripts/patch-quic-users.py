@@ -17,11 +17,12 @@ for proto in ("hysteria2", "tuic"):
     if "userconns sync.Map" in text:
         raise RuntimeError(f"{path}: V2bX extension already present")
     text = replace_once(text, '"net"', '"net"\n\t"sync"')
-    text = replace_once(
-        text,
-        "\tuserNameList []string\n}",
-        "\tuserNameList []string\n\tuserPasswords []string\n\tuserUUIDs []string\n\tuuidToUid map[string]int\n\tuidToUuid map[int]string\n\tuserconns sync.Map\n}",
+    extra_fields = (
+        "\tuserNameList []string\n\tuserPasswords []string\n"
+        + ("\tuserUUIDs []string\n" if proto == "tuic" else "")
+        + "\tuuidToUid map[string]int\n\tuidToUuid map[int]string\n\tuserconns sync.Map\n}"
     )
+    text = replace_once(text, "\tuserNameList []string\n}", extra_fields)
     key_field = "Password" if proto == "hysteria2" else "UUID"
     init = (
         "\tinbound.uuidToUid = make(map[string]int, len(options.Users))\n"
