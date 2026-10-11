@@ -330,6 +330,7 @@ jobs:
       - name: Create GitHub release
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
         uses: ncipollo/release-action@v1
+        continue-on-error: true
         with:
           tag: ${{ steps.push.outputs.tag }}
           name: "sing-box ${{ steps.upstream.outputs.tag }}"
