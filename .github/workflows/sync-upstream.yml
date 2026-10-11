@@ -275,6 +275,13 @@ jobs:
           V2BX_TAG="v2bx-${{ steps.upstream.outputs.version }}"
 
           cd "$UPSTREAM"
+          if git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
+            echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
+            echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "Tag already exists on remote: ${V2BX_TAG}"
+            exit 0
+          fi
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git checkout -B v2bx-stable
