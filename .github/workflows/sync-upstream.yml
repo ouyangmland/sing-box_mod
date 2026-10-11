@@ -206,6 +206,17 @@ jobs:
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
           files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go')
+          lifecycle_source = Path('adapter/lifecycle.go').read_text()
+          start_uses_scope = 'Start(stage StartStage, scope *Scope)' in lifecycle_source
+
+          if start_uses_scope:
+              for name in files:
+                  path = Path(name)
+                  if not path.exists():
+                      continue
+                  content = path.read_text()
+                  content = content.replace('func (h *Inbound) Start(stage adapter.StartStage) error {', 'func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {')
+                  path.write_text(content)
 
           if upstream_uses_ex:
               replacements = {
