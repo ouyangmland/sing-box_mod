@@ -19,7 +19,7 @@ type ruleSetItemTestRouter struct {
 }
 
 func (r *ruleSetItemTestRouter) Start(adapter.StartStage, *adapter.Scope) error { return nil }
-func (r *ruleSetItemTestRouter) GetCtx() context.Context                        { return context.Background() }
+func (r *ruleSetItemTestRouter) GetCtx() context.Context { return context.Background() }
 func (r *ruleSetItemTestRouter) PreMatch(adapter.InboundContext, []byte) adapter.PreMatchResult {
 	return adapter.PreMatchResult{}
 }

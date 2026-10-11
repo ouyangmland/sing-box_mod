@@ -31,17 +31,17 @@ func RegisterInbound(registry *inbound.Registry) {
 
 type Inbound struct {
 	inbound.Adapter
-	router        adapter.ConnectionRouterEx
-	logger        log.ContextLogger
-	listener      *listener.Listener
-	tlsConfig     tls.ServerConfig
-	server        *tuic.Service[int]
-	userNameList  []string
+	router       adapter.ConnectionRouterEx
+	logger       log.ContextLogger
+	listener     *listener.Listener
+	tlsConfig    tls.ServerConfig
+	server       *tuic.Service[int]
+	userNameList []string
 	userPasswords []string
-	userUUIDs     []string
-	uuidToUid     map[string]int
-	uidToUuid     map[int]string
-	userconns     sync.Map
+	userUUIDs []string
+	uuidToUid map[string]int
+	uidToUuid map[int]string
+	userconns sync.Map
 }
 
 func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.TUICInboundOptions) (adapter.Inbound, error) {
@@ -119,9 +119,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		inbound.uidToUuid[index] = user.UUID
 	}
 	inbound.userPasswords = append([]string(nil), userPasswordList...)
-	for _, user := range options.Users {
-		inbound.userUUIDs = append(inbound.userUUIDs, user.UUID)
-	}
+	for _, user := range options.Users { inbound.userUUIDs = append(inbound.userUUIDs, user.UUID) }
 	return inbound, nil
 }
 

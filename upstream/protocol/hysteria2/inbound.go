@@ -3,12 +3,12 @@ package hysteria2
 import (
 	"context"
 	"net"
+	"sync"
 	"net/http"
 	"net/http/httputil"
 	"net/netip"
 	"net/url"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -38,16 +38,16 @@ func RegisterInbound(registry *inbound.Registry) {
 
 type Inbound struct {
 	inbound.Adapter
-	router        adapter.Router
-	logger        log.ContextLogger
-	listener      *listener.Listener
-	tlsConfig     tls.ServerConfig
-	service       *hysteria2.Service[int]
-	userNameList  []string
+	router       adapter.Router
+	logger       log.ContextLogger
+	listener     *listener.Listener
+	tlsConfig    tls.ServerConfig
+	service      *hysteria2.Service[int]
+	userNameList []string
 	userPasswords []string
-	uuidToUid     map[string]int
-	uidToUuid     map[int]string
-	userconns     sync.Map
+	uuidToUid map[string]int
+	uidToUuid map[int]string
+	userconns sync.Map
 }
 
 func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.Hysteria2InboundOptions) (adapter.Inbound, error) {
