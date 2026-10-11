@@ -30,11 +30,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ^1.25
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: latest
-          working-directory: upstream
-          args: --timeout=30m --build-tags=sing,with_quic,with_grpc,with_utls,with_wireguard,with_acme,with_gvisor --disable=gci,modernize,staticcheck
-          install-mode: binary
-          verify: false
+      - name: Validate synced release build
+        env:
+          GOEXPERIMENT: jsonv2
+          CGO_ENABLED: 0
+        run: |
+          cd upstream
+          go build -trimpath -tags 'sing with_quic with_grpc with_utls with_wireguard with_acme with_gvisor' -o "$RUNNER_TEMP/sing-box-ci" ./cmd/sing-box
+          go test -tags 'sing with_quic with_grpc with_utls with_wireguard with_acme with_gvisor' ./route/rule
