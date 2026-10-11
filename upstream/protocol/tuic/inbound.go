@@ -3,6 +3,7 @@ package tuic
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -30,12 +31,17 @@ func RegisterInbound(registry *inbound.Registry) {
 
 type Inbound struct {
 	inbound.Adapter
-	router       adapter.ConnectionRouterEx
-	logger       log.ContextLogger
-	listener     *listener.Listener
-	tlsConfig    tls.ServerConfig
-	server       *tuic.Service[int]
-	userNameList []string
+	router        adapter.ConnectionRouterEx
+	logger        log.ContextLogger
+	listener      *listener.Listener
+	tlsConfig     tls.ServerConfig
+	server        *tuic.Service[int]
+	userNameList  []string
+	userPasswords []string
+	userUUIDs     []string
+	uuidToUid     map[string]int
+	uidToUuid     map[int]string
+	userconns     sync.Map
 }
 
 func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.TUICInboundOptions) (adapter.Inbound, error) {
@@ -106,10 +112,20 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	service.UpdateUsers(userList, userUUIDList, userPasswordList)
 	inbound.server = service
 	inbound.userNameList = userNameList
+	inbound.uuidToUid = make(map[string]int, len(options.Users))
+	inbound.uidToUuid = make(map[int]string, len(options.Users))
+	for index, user := range options.Users {
+		inbound.uuidToUid[user.UUID] = index
+		inbound.uidToUuid[index] = user.UUID
+	}
+	inbound.userPasswords = append([]string(nil), userPasswordList...)
+	for _, user := range options.Users {
+		inbound.userUUIDs = append(inbound.userUUIDs, user.UUID)
+	}
 	return inbound, nil
 }
 
-func (h *Inbound) NewConnection(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {
+func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {
 	ctx = log.ContextWithNewID(ctx)
 	var metadata adapter.InboundContext
 	metadata.Inbound = h.Tag()
@@ -128,6 +144,8 @@ func (h *Inbound) NewConnection(ctx context.Context, conn net.Conn, source M.Soc
 	} else {
 		h.logger.InfoContext(ctx, "inbound connection to ", metadata.Destination)
 	}
+	h.userconns.Store(conn, metadata.User)
+	defer h.userconns.Delete(conn)
 	h.router.RouteConnectionEx(ctx, conn, metadata, onClose)
 }
 

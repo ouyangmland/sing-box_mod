@@ -122,7 +122,10 @@ jobs:
           # protocols where the old MoeclubM override no longer matches upstream APIs.
           for proto in vmess vless trojan shadowsocks tuic hysteria hysteria2 anytls; do
             mkdir -p "protocol/${proto}"
-            [ -f "${MoeMod}/protocol/${proto}/${proto}_user.go" ] && cp "${MoeMod}/protocol/${proto}/${proto}_user.go" "protocol/${proto}/"
+            case "$proto" in
+              hysteria2|tuic) ;; # Generate a current-upstream-compatible user extension below.
+              *) [ -f "${MoeMod}/protocol/${proto}/${proto}_user.go" ] && cp "${MoeMod}/protocol/${proto}/${proto}_user.go" "protocol/${proto}/" ;;
+            esac
             case "$proto" in
               vless|trojan|anytls)
                 [ -f "${MoeMod}/protocol/${proto}/inbound.go" ] && cp "${MoeMod}/protocol/${proto}/inbound.go" "protocol/${proto}/"
@@ -205,11 +208,12 @@ jobs:
           # files follow whichever API exists in the official upstream tree.
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
-          files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go', 'protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
+          # Only normalize inbound.go files copied from MoeclubM. The upstream
+          # Hysteria2/TUIC handlers implement sing-quic's separate Ex interface.
+          files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go')
           lifecycle_source = Path('adapter/lifecycle.go').read_text()
           start_uses_scope = 'Start(stage StartStage, scope *Scope)' in lifecycle_source
 
@@ -244,6 +248,7 @@ jobs:
                   content = content.replace(old, new)
               path.write_text(content)
           PY
+          python3 "$GITHUB_WORKSPACE/scripts/patch-quic-users.py"
           echo "Fixed stale MoeclubM patches for current upstream APIs"
 
 
@@ -279,20 +284,15 @@ jobs:
           V2BX_TAG="v2bx-${{ steps.upstream.outputs.version }}"
 
           cd "$UPSTREAM"
-          if [[ "${{ github.event.inputs.force }}" != "true" ]] && git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
-            echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
-            echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
-            echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "Tag already exists on remote: ${V2BX_TAG}"
-            exit 0
-          fi
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git checkout -B v2bx-stable
           git add -A
           if git diff --cached --quiet; then
-            git tag -a "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
-            git push origin "${V2BX_TAG}"
+            if ! git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
+              git tag -a "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
+              git push origin "${V2BX_TAG}"
+            fi
             echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
             echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
@@ -301,8 +301,10 @@ jobs:
           fi
           git commit -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
           git push origin v2bx-stable --force-with-lease
-          git tag -fa "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
-          git push origin --force "${V2BX_TAG}"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
+            git tag -a "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
+            git push origin "${V2BX_TAG}"
+          fi
           echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
           echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
           echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
@@ -331,10 +333,22 @@ jobs:
           fi
           echo "Build triggered"
 
-      - name: Create GitHub release
+      - name: Check if release exists
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != ''
+        id: release_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if curl -fsS -o /dev/null -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${{ steps.push.outputs.tag }}"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != '' && steps.release_check.outputs.exists != 'true'
         uses: ncipollo/release-action@v1
-        continue-on-error: true
         with:
           tag: ${{ steps.push.outputs.tag }}
           name: "sing-box ${{ steps.upstream.outputs.tag }}"
