@@ -206,6 +206,7 @@ jobs:
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
           files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go', 'protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
+          quic_files = ('protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
           lifecycle_source = Path('adapter/lifecycle.go').read_text()
           start_uses_scope = 'Start(stage StartStage, scope *Scope)' in lifecycle_source
 
@@ -217,6 +218,7 @@ jobs:
                   content = path.read_text()
                   content = content.replace('func (h *Inbound) Start(stage adapter.StartStage) error {', 'func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {')
                   content = content.replace('func (h *Inbound) NewConnection(', 'func (h *Inbound) NewConnectionEx(')
+                  content = content.replace('func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc)', 'func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc)')
                   path.write_text(content)
 
           if upstream_uses_ex:
@@ -239,6 +241,8 @@ jobs:
               content = path.read_text()
               for old, new in replacements.items():
                   content = content.replace(old, new)
+              if name in quic_files:
+                  content = content.replace('func (h *Inbound) NewConnection(', 'func (h *Inbound) NewConnectionEx(')
               path.write_text(content)
           PY
           echo "Fixed stale MoeclubM patches for current upstream APIs"
