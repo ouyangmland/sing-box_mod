@@ -352,12 +352,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if curl -fsS -o /dev/null -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${{ steps.push.outputs.tag }}"; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${{ steps.push.outputs.tag }}")
+          case "$code" in
+            200) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Release lookup failed: HTTP $code" >&2; exit 1 ;;
+          esac
 
       - name: Create GitHub release
         if: steps.check_tag.outputs.exists != 'true' && steps.push.outputs.tag != '' && steps.release_check.outputs.exists != 'true'
