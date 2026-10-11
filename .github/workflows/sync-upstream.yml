@@ -205,7 +205,7 @@ jobs:
 
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
-          files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go')
+          files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go', 'protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
           lifecycle_source = Path('adapter/lifecycle.go').read_text()
           start_uses_scope = 'Start(stage StartStage, scope *Scope)' in lifecycle_source
 
