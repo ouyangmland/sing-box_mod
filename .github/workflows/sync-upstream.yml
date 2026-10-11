@@ -124,9 +124,12 @@ jobs:
             mkdir -p "protocol/${proto}"
             [ -f "${MoeMod}/protocol/${proto}/${proto}_user.go" ] && cp "${MoeMod}/protocol/${proto}/${proto}_user.go" "protocol/${proto}/"
             case "$proto" in
-              vless|trojan|tuic|hysteria2|anytls)
+              vless|trojan|anytls)
                 [ -f "${MoeMod}/protocol/${proto}/inbound.go" ] && cp "${MoeMod}/protocol/${proto}/inbound.go" "protocol/${proto}/"
                 ;;
+              # Keep upstream Hysteria2/TUIC inbound implementations: their
+              # current sing-quic handler APIs changed repeatedly. The upstream
+              # files already expose the user maps required by *_user.go.
             esac
           done
 
@@ -207,7 +210,6 @@ jobs:
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
           files = ('protocol/anytls/inbound.go', 'protocol/vless/inbound.go', 'protocol/trojan/inbound.go', 'protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
-          quic_files = ('protocol/hysteria2/inbound.go', 'protocol/tuic/inbound.go')
           lifecycle_source = Path('adapter/lifecycle.go').read_text()
           start_uses_scope = 'Start(stage StartStage, scope *Scope)' in lifecycle_source
 
@@ -240,8 +242,6 @@ jobs:
               content = path.read_text()
               for old, new in replacements.items():
                   content = content.replace(old, new)
-              if name in quic_files:
-                  content = re.sub(r'func \(h \*Inbound\) NewConnection(?:Ex)?\(', 'func (h *Inbound) NewConnectionEx(', content)
               path.write_text(content)
           PY
           echo "Fixed stale MoeclubM patches for current upstream APIs"
@@ -279,7 +279,7 @@ jobs:
           V2BX_TAG="v2bx-${{ steps.upstream.outputs.version }}"
 
           cd "$UPSTREAM"
-          if git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
+          if [[ "${{ github.event.inputs.force }}" != "true" ]] && git ls-remote --exit-code --tags origin "refs/tags/${V2BX_TAG}" >/dev/null 2>&1; then
             echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
             echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
@@ -301,8 +301,8 @@ jobs:
           fi
           git commit -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
           git push origin v2bx-stable --force-with-lease
-          git tag -a "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
-          git push origin "${V2BX_TAG}"
+          git tag -fa "${V2BX_TAG}" -m "V2BX: sync with sing-box ${{ steps.upstream.outputs.tag }}"
+          git push origin --force "${V2BX_TAG}"
           echo "tag=${V2BX_TAG}" >> "$GITHUB_OUTPUT"
           echo "upstream_tag=${{ steps.upstream.outputs.tag }}" >> "$GITHUB_OUTPUT"
           echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
