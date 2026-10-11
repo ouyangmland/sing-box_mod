@@ -249,6 +249,19 @@ jobs:
               path.write_text(content)
           PY
           python3 "$GITHUB_WORKSPACE/scripts/patch-quic-users.py"
+          # The V2bX Router interface has GetCtx; keep the upstream test stub
+          # implementing that interface so lint/typecheck can compile tests.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('route/rule/rule_item_rule_set_test.go')
+          if path.exists():
+              source = path.read_text()
+              anchor = 'func (r *ruleSetItemTestRouter) Start(adapter.StartStage, *adapter.Scope) error { return nil }'
+              if 'func (r *ruleSetItemTestRouter) GetCtx() context.Context' not in source:
+                  if source.count(anchor) != 1:
+                      raise RuntimeError('missing ruleSetItemTestRouter Start method')
+                  path.write_text(source.replace(anchor, anchor + '\nfunc (r *ruleSetItemTestRouter) GetCtx() context.Context { return context.Background() }', 1))
+          PY
           echo "Fixed stale MoeclubM patches for current upstream APIs"
 
 
