@@ -217,8 +217,6 @@ jobs:
                       continue
                   content = path.read_text()
                   content = content.replace('func (h *Inbound) Start(stage adapter.StartStage) error {', 'func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {')
-                  content = content.replace('func (h *Inbound) NewConnection(', 'func (h *Inbound) NewConnectionEx(')
-                  content = content.replace('func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc)', 'func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc)')
                   path.write_text(content)
 
           if upstream_uses_ex:
