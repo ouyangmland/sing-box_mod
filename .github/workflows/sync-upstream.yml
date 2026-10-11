@@ -202,6 +202,7 @@ jobs:
           # files follow whichever API exists in the official upstream tree.
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           handler_source = Path('adapter/handler.go').read_text()
           upstream_uses_ex = 'type ConnectionHandlerEx interface' in handler_source and 'NewConnectionEx(' in handler_source
@@ -240,7 +241,7 @@ jobs:
               for old, new in replacements.items():
                   content = content.replace(old, new)
               if name in quic_files:
-                  content = content.replace('func (h *Inbound) NewConnection(', 'func (h *Inbound) NewConnectionEx(')
+                  content = re.sub(r'func \(h \*Inbound\) NewConnection(?:Ex)?\(', 'func (h *Inbound) NewConnectionEx(', content)
               path.write_text(content)
           PY
           echo "Fixed stale MoeclubM patches for current upstream APIs"
